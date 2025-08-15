@@ -2,6 +2,7 @@ using QuizApp.Components;
 using Microsoft.Extensions.AI;
 using Azure.AI.OpenAI;
 using System.ClientModel;
+using OpenAI.Chat;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,16 +10,14 @@ var builder = WebApplication.CreateBuilder(args);
 //  - Decide which LLM backend you're going to use, and register it in DI
 //  - It can be any IChatClient implementation, for example AzureOpenAIClient or OllamaChatClient
 //  - See instructions for sample code
-
-// Note that AzureOpenAIClient works with both GitHub Models and Azure OpenAI endpoints
-var innerChatClient = new AzureOpenAIClient( 
+AzureOpenAIClient azureClient = new AzureOpenAIClient(
     new Uri(builder.Configuration["AI:Endpoint"]!),
-    new ApiKeyCredential(builder.Configuration["AI:Key"]!))
-    .GetChatClient("gpt-4o-mini").AsIChatClient();
+    new ApiKeyCredential(builder.Configuration["AI:Key"]!));
 
-builder.Services.AddChatClient(innerChatClient);
+ChatClient chatClient = azureClient.GetChatClient("gpt-4o-mini");
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddChatClient(chatClient.AsIChatClient());
 
 var app = builder.Build();
 
