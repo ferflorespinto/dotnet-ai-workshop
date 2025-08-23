@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>CS1998;$(NoWarn)</NoWarn>
+    <UseFaissNet Condition="'$(OS)' == 'Windows_NT'">true</UseFaissNet>
+    <DefineConstants Condition="'$(UseFaissNet)' == 'true'">$(DefineConstants);USE_FAISS_NET</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.Ollama" />
+    <PackageReference Include="SmartComponents.LocalEmbeddings" />
+    <PackageReference Include="System.Numerics.Tensors" />
+
+    <!--
+      Using Faiss isn't very straightforwards, as it requires a native library, and none of the .NET packages
+      includes it for all runtimes. Since we're only using it for educational purposes here and not for a real
+      application or package, we'll work around this by using two different packages:
+        - FaissNet for Windows
+        - FaissMask for Linux/macOS
+      In a real app you'd likely use an external vector DB which in most cases wraps Faiss. In this workshop
+      it's educational to use the underlying library directly.
+    -->
+    <PackageReference Include="FaissMask" Condition="'$(UseFaissNet)' != 'true'" />
+    <PackageReference Include="FaissNet" Condition="'$(UseFaissNet)' == 'true'" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Support\issues.json.zip" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="runtimes\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
