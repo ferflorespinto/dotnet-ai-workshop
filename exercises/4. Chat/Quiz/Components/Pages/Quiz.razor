@@ -1,0 +1,28 @@
+﻿@page "/quiz"
+
+<h2>Question @currentQuestionNumber of @numQuestions. Your score: @pointsScored points</h2>
+
+<p class="question">@(currentQuestionText ?? "Getting question...")</p>
+
+<EditForm Model="@this" OnValidSubmit="@SubmitAnswerAsync" OnInvalidSubmit="@(() => answerInput.FocusAsync())">
+    <textarea @ref="@answerInput" @bind="@UserAnswer" placeholder="Type your answer..." disabled="@DisableForm"></textarea>
+    <p><button type="submit" class="btn btn-primary" disabled="@DisableForm">Submit</button></p>
+
+    <DataAnnotationsValidator />
+    <ValidationMessage For="@(() => UserAnswer)" />
+</EditForm>
+
+@if (!string.IsNullOrEmpty(currentQuestionOutcome))
+{
+    <h3>@currentQuestionOutcome</h3>
+
+    @if (currentQuestionNumber < numQuestions)
+    {
+        <button class="btn btn-primary" @onclick="@MoveToNextQuestionAsync">Next question</button>
+    }
+    else
+    {
+        <p><strong>That's all for the quiz. You got @pointsScored points.</strong></p>
+        <p><a class="btn btn-primary" href="">Home</a></p>
+    }
+}
