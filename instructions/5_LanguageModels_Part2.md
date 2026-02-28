@@ -372,12 +372,19 @@ Here's how you would connect to an external MCP server using the actual MCP tool
 
 **Step 1: Create a separate MCP server project**
 
-Create a new console application for your MCP server:
+Create a new console application for your MCP server. Run the following from the project working directory:
 
 ```bash
-dotnet new console -n ECommerceMcpServer
-cd ECommerceMcpServer
+dotnet new console -n ECommerceMcpServer -o ../ECommerceMcpServer
+```
+
+This will create a new project folder in the parent folder of our working directory. At this point I suggest to open the new ECommerceMcpServer project in another VS Code instance to have on the side.
+
+Once you have opened the project, inspect the `ECommerceMcpServe.csproj` file and ensure the target framework is .NET 9. Then add the `ModelContextProtocol` and the `Microsoft.Extensions.Hosting` packages:
+
+```bash
 dotnet add package ModelContextProtocol
+dotnet add package Microsoft.Extensions.Hosting
 ```
 
 **Step 2: Implement the MCP server**
@@ -485,6 +492,7 @@ public class ECommerceMcpServer
 
 A few things to note here:
 
+* Notice the namespace import of `ModelContextProtocol.Server`
 * The MCP server is annotated as a `McpServerToolType`
 * Each action we want to enable to the MCP is annotated as a `McpServerTool`, with a `Name` and `Title`
 * We initiate an instance of `ECommerceMcpServer` with a `CartService`, which we will pass later in `Program.cs` via dependency injection
@@ -522,7 +530,7 @@ Alternatively, if you had some way of running `ECommerceMcpServer` indefinitely 
 Create a `Dockerfile` in the root of the project folder:
 
 ```dockerfile
-# Copy all files onto the image and build the project
+# Copy all files onto the image and build/publish the project
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /app
 ARG configuration=Release
@@ -570,12 +578,18 @@ Now let's try to build a Docker image:
 
 ```bash
 # Ensure the name "mcpserver" is not currently in use by another image
-docker build -t "mcpserver"
+# This will run the build process on your current working directory
+docker build -t "mcpserver" .
 ```
 
-And oh no! We got a couple of NU1604 warnings: `Project dependency 'ModelContextProtocol' does not contain an inclusive lower bound. Include a lower bound in the dependency version to ensure consistent restore results.`
+And oh no! We got a couple of errors when Docker attempted a NuGet restore, stemming from a couple of NU1604 warnings:
 
-It doesn't seem like Docker likes packages without defined versions when doing a package restore with the SDK. Let's fix that.
+```log
+8.219 /app/ECommerceMcpServer.csproj : warning NU1604: Project dependency Microsoft.Extensions.Hosting does not contain an inclusive lower bound. Include a lower bound in the dependency version to ensure consistent restore results. [/app/ECommerceMcpServer.sln]
+8.219 /app/ECommerceMcpServer.csproj : warning NU1604: Project dependency ModelContextProtocol does not contain an inclusive lower bound. Include a lower bound in the dependency version to ensure consistent restore results. [/app/ECommerceMcpServer.sln]
+```
+
+It appears Docker does not like packages without defined versions here, so let's fix that.
 
 At the project root, run:
 
@@ -603,14 +617,27 @@ Let's try to build the docker image once more:
 
 ```bash
 # Ensure the name "mcpserver" is not currently in use by another image
-docker build -t "mcpserver"
+# This will run the build process on your current working directory
+docker build -t "mcpserver" .
 ```
 
 This should now build without issues. At this point, we're ready to setup the connection on the chat client side of things.
 
 **Step 4: Connect from your chat client**
 
-In your main chat application, connect to the external MCP server:
+Like with the ECommerceMcpServer project, we will need the ModelContextProtocol package on our main chat applicatino too:
+
+```bash
+dotnet add package ModelContextProtocol
+```
+
+And add a new using statement to `Program.cs`:
+
+```cs
+using ModelContextProtocol.Client;
+```
+
+Then, connect to the external MCP server:
 
 ```cs
 // Create an MCP client that connects to the external server
