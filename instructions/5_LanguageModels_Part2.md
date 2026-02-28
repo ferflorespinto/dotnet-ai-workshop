@@ -552,14 +552,14 @@ Create a `.dockerignore` file:
 **/*.*proj.user
 **/*.dbmdl
 **/*.jfm
-#**/bin
+**/bin
 **/charts
 **/docker-compose*
 **/compose*
 **/Dockerfile*
 **/node_modules
 **/npm-debug.log
-#**/obj
+**/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
 LICENSE
@@ -599,7 +599,7 @@ This will add a new `Directory.Packages.props` file. Open the file and replace i
 
 What we're doing here is telling the SDK that we want specific versions of the packages we restore, and at the same time enabling Central Package Management (CPM). Note: the versions included here are the latest versions of the packages at the time of writing. Ensure that you're pulling correct versions.
 
-Let's try building the docker image once more:
+Let's try to build the docker image once more:
 
 ```bash
 # Ensure the name "mcpserver" is not currently in use by another image
@@ -634,7 +634,7 @@ var chatOptions = new ChatOptions
 
 Now try to run the client application. This should create a Docker container for you that will live for the duration of the client application process.
 
-Try to send a few prompts to the chat client. If you have Docker logs handy, you will notice the MCP performing actions in the background, without exposing what it does to the end user. Here is an example of the logs produced from a few prompts I ran:
+Try to send a few prompts to the chat client. If you have Docker logs handy, you will notice the MCP server app performing actions in the background, without exposing what it does to the end user. Here is an example of the logs produced from a few prompts I ran:
 
 ```log
 2026-02-27 18:08:09.072 | {"result":{"protocolVersion":"2025-06-18","capabilities":{"logging":{},"tools":{"listChanged":true}},"serverInfo":{"name":"ECommerceMcpServer","version":"1.0.0.0"}},"id":1,"jsonrpc":"2.0"}
