@@ -625,7 +625,7 @@ This should now build without issues. At this point, we're ready to setup the co
 
 **Step 4: Connect from your chat client**
 
-Like with the ECommerceMcpServer project, we will need the ModelContextProtocol package on our main chat applicatino too:
+Like with the ECommerceMcpServer project, we will need the ModelContextProtocol package on our main chat application too:
 
 ```bash
 dotnet add package ModelContextProtocol
