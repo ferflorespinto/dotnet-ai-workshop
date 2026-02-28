@@ -283,7 +283,7 @@ The MCP toolkit is now available for .NET! Let's create the same sock pricing fu
 Add the MCP package to your project:
 
 ```bash
-dotnet add package ModelContextProtocol --prerelease
+dotnet add package ModelContextProtocol
 ```
 
 Now, let's create an MCP server that provides the same functionality. Add this class to your `Program.cs` file:
@@ -377,44 +377,99 @@ Create a new console application for your MCP server:
 ```bash
 dotnet new console -n ECommerceMcpServer
 cd ECommerceMcpServer
-dotnet add package ModelContextProtocol --prerelease
+dotnet add package ModelContextProtocol
 ```
 
 **Step 2: Implement the MCP server**
 
+We will move our `Cart` class to the new `ECommerceMcpServer` project. Then we will rename it to `CartService`:
+
+```cs
+// CartService.cs
+
+using System.ComponentModel;
+
+public class CartService
+{
+    public int NumPairsOfSocks { get; set; }
+    
+    [Description("Adds the specified number of pairs of socks to the cart")]
+    public void AddSocksToCart(int numPairs)
+    {
+        NumPairsOfSocks += numPairs;
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("*****");
+        Console.WriteLine($"Added {numPairs} pairs to your cart. Total: {NumPairsOfSocks} pairs.");
+        Console.WriteLine("*****");
+        Console.ForegroundColor = ConsoleColor.White;
+    }
+
+    [Description("Removes the specified number of pairs of socks from the cart, or the items remaining, whichever is lower.")]
+    public void RemoveSocksFromCart(int numPairs)
+    {
+        int numPairsToRemove = numPairs > NumPairsOfSocks ? NumPairsOfSocks : numPairs;
+        NumPairsOfSocks -= numPairsToRemove;
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("*****");
+        Console.WriteLine($"Removed {numPairsToRemove} pairs from your cart. Total: {NumPairsOfSocks} pairs.");
+        Console.WriteLine("*****");
+        Console.ForegroundColor = ConsoleColor.White;
+    }
+    
+    [Description("Removes all pairs of socks from the cart.")]
+    public void EmptyCart()
+    {
+        string message = NumPairsOfSocks == 0 ? "Cart is already empty" : "Emptied your cart";
+        NumPairsOfSocks = 0;
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("*****");
+        Console.WriteLine($"{message}. Total: {NumPairsOfSocks} pairs.");
+        Console.WriteLine("*****");
+        Console.ForegroundColor = ConsoleColor.White;
+    }
+
+    [Description("Computes the price of socks, returning a value in dollars.")]
+    public float GetPrice(
+        [Description("The number of pairs of socks to calculate price for")] int count)
+        => count * 15.99f;
+}
+```
+
 In the MCP server project, create a proper MCP server implementation:
 
 ```cs
-using ModelContextProtocol.Server;
+// ECommerceMcpServer.cs
+
 using System.ComponentModel;
+using ModelContextProtocol.Server;
 
-// Move your Cart class here
-class Cart
+[McpServerToolType]
+public class ECommerceMcpServer
 {
-    public int NumPairsOfSocks { get; set; }
-    // ... rest of Cart implementation
-}
+    private readonly CartService _cart;
 
-// Create a proper MCP server
-public class ECommerceMcpServer : McpServer
-{
-    private readonly Cart _cart = new();
+    public ECommerceMcpServer(CartService cart)
+    {
+        _cart = cart;
+    }
 
-    [McpTool("get_price")]
+    // MCP tools
+    [McpServerTool(Name = "get_price", Title = "Computes the price of socks, returning a value in dollars")]
     [Description("Computes the price of socks, returning a value in dollars")]
-    public float GetPrice([Description("The number of pairs of socks to calculate price for")] int count)
+    public float GetPrice([Description("The number of pairs of socks to calculate price for")]int count)
     {
         return _cart.GetPrice(count);
     }
 
-    [McpTool("add_to_cart")]
+    [McpServerTool(Name = "add_to_cart", Title = "Adds the specified number of pairs of socks to the cart")]
     [Description("Adds the specified number of pairs of socks to the cart")]
     public void AddSocksToCart([Description("The number of pairs to add")] int numPairs)
     {
         _cart.AddSocksToCart(numPairs);
     }
 
-    [McpTool("get_cart_status")]
+    [McpServerTool(Name = "get_cart_status", Title = "Gets the current cart contents")]
     [Description("Gets the current cart contents")]
     public object GetCartStatus()
     {
@@ -426,19 +481,134 @@ public class ECommerceMcpServer : McpServer
         };
     }
 }
-
-// Program.cs for the MCP server
-public class Program
-{
-    public static async Task Main(string[] args)
-    {
-        var server = new ECommerceMcpServer();
-        await server.RunAsync(); // Runs on stdin/stdout
-    }
-}
 ```
 
-**Step 3: Connect from your chat client**
+A few things to note here:
+
+* The MCP server is annotated as a `McpServerToolType`
+* Each action we want to enable to the MCP is annotated as a `McpServerTool`, with a `Name` and `Title`
+* We initiate an instance of `ECommerceMcpServer` with a `CartService`, which we will pass later in `Program.cs` via dependency injection
+
+Finally, in `Program.cs` we will setup our console app as a `stdio` server:
+
+```cs
+// Program.cs
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+var builder = Host.CreateEmptyApplicationBuilder(null);
+
+builder.Services
+    .AddSingleton<CartService>()
+    .AddMcpServer()
+    .WithStdioServerTransport()
+    .WithToolsFromAssembly();
+
+var app = builder.Build();
+await app.RunAsync();
+```
+
+A `stdio` server is just a local MCP server that communicates with chat clients using standard input (`stdin`) and output (`stdout`). This is primarily for local integrations, and can execute as a subprocess of whatever host application to provide tools or data without needing networking. For this workshop, this should be good enough to get the idea across, but note this is the simplest form of MCP.
+
+Although simple however, a `stdio` server can have some really strong use cases, like interacting with shell, the file system, etc. This is because it runs locally without involving any networking, and can be appealing with privacy-sensitive processes.
+
+**Step 3: Set up ECommerceMcpServer with Docker**
+
+This step is somewhat optional, but the rest of the steps will assume you completed this step so it is recommended to follow. Normally, the simple approach would be to just call `dotnet run` on the MCP server app from the client app, but there are restrictions around executing arbitrary .exe in our staff images.
+
+Alternatively, if you had some way of running `ECommerceMcpServer` indefinitely in the background (e.g. running in another instance of VS Code), that approach can work as well, but it makes for a less elegant solution.
+
+Create a `Dockerfile` in the root of the project folder:
+
+```dockerfile
+# Copy all files onto the image and build the project
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /app
+ARG configuration=Release
+COPY . .
+RUN dotnet publish -c Release -o /app/publish
+
+# Runtime and entrypoint
+FROM mcr.microsoft.com/dotnet/runtime:9.0
+WORKDIR /app
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "ECommerceMcpServer.dll"]
+```
+
+Create a `.dockerignore` file:
+
+```ignore
+**/.classpath
+**/.dockerignore
+**/.env
+**/.git
+**/.gitignore
+**/.project
+**/.settings
+**/.toolstarget
+**/.vs
+**/.vscode
+**/*.*proj.user
+**/*.dbmdl
+**/*.jfm
+#**/bin
+**/charts
+**/docker-compose*
+**/compose*
+**/Dockerfile*
+**/node_modules
+**/npm-debug.log
+#**/obj
+**/secrets.dev.yaml
+**/values.dev.yaml
+LICENSE
+README.md
+```
+
+Now let's try to build a Docker image:
+
+```bash
+# Ensure the name "mcpserver" is not currently in use by another image
+docker build -t "mcpserver"
+```
+
+And oh no! We got a couple of NU1604 warnings: `Project dependency 'ModelContextProtocol' does not contain an inclusive lower bound. Include a lower bound in the dependency version to ensure consistent restore results.`
+
+It doesn't seem like Docker likes packages without defined versions when doing a package restore with the SDK. Let's fix that.
+
+At the project root, run:
+
+```bash
+dotnet new packagesprops
+```
+
+This will add a new `Directory.Packages.props` file. Open the file and replace its contents with the following:
+
+```xml
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
+    <PackageVersion Include="ModelContextProtocol" Version="1.0.0" />
+  </ItemGroup>
+</Project>
+```
+
+What we're doing here is telling the SDK that we want specific versions of the packages we restore, and at the same time enabling Central Package Management (CPM). Note: the versions included here are the latest versions of the packages at the time of writing. Ensure that you're pulling correct versions.
+
+Let's try building the docker image once more:
+
+```bash
+# Ensure the name "mcpserver" is not currently in use by another image
+docker build -t "mcpserver"
+```
+
+This should now build without issues. At this point, we're ready to setup the connection on the chat client side of things.
+
+**Step 4: Connect from your chat client**
 
 In your main chat application, connect to the external MCP server:
 
@@ -447,9 +617,9 @@ In your main chat application, connect to the external MCP server:
 IMcpClient mcpClient = await McpClientFactory.CreateAsync(
     new StdioClientTransport(new()
     {
-        Command = "dotnet",
-        Arguments = ["run", "--project", "path/to/ECommerceMcpServer"],
-        Name = "E-commerce MCP Server",
+        Command = "docker",
+        Arguments = ["run", "-i", "--rm", "mcpserver"],
+        Name = "E-commerce MCP Server"
     }));
 
 // Get tools from the MCP server
@@ -460,6 +630,29 @@ var chatOptions = new ChatOptions
 { 
     Tools = [.. tools] 
 };
+```
+
+Now try to run the client application. This should create a Docker container for you that will live for the duration of the client application process.
+
+Try to send a few prompts to the chat client. If you have Docker logs handy, you will notice the MCP performing actions in the background, without exposing what it does to the end user. Here is an example of the logs produced from a few prompts I ran:
+
+```log
+2026-02-27 18:08:09.072 | {"result":{"protocolVersion":"2025-06-18","capabilities":{"logging":{},"tools":{"listChanged":true}},"serverInfo":{"name":"ECommerceMcpServer","version":"1.0.0.0"}},"id":1,"jsonrpc":"2.0"}
+2026-02-27 18:08:09.158 | {"result":{"tools":[{"name":"get_cart_status","title":"Gets the current cart contents","description":"Gets the current cart contents","inputSchema":{"type":"object","properties":{}},"annotations":{"title":"Gets the current cart contents"}},{"name":"add_to_cart","title":"Adds the specified number of pairs of socks to the cart","description":"Adds the specified number of pairs of socks to the cart","inputSchema":{"type":"object","properties":{"numPairs":{"description":"The number of pairs to add","type":"integer"}},"required":["numPairs"]},"annotations":{"title":"Adds the specified number of pairs of socks to the cart"}},{"name":"get_price","title":"Computes the price of socks, returning a value in dollars","description":"Computes the price of socks, returning a value in dollars","inputSchema":{"type":"object","properties":{"count":{"description":"The number of pairs of socks to calculate price for","type":"integer"}},"required":["count"]},"annotations":{"title":"Computes the price of socks, returning a value in dollars"}}]},"id":2,"jsonrpc":"2.0"}
+2026-02-27 18:08:27.274 | {"result":{"content":[{"type":"text","text":"1599"}]},"id":3,"jsonrpc":"2.0"}
+2026-02-27 18:08:49.357 | *****
+2026-02-27 18:08:49.357 | Added 50 pairs to your cart. Total: 50 pairs.
+2026-02-27 18:08:49.357 | *****
+2026-02-27 18:08:49.358 | {"result":{"content":[]},"id":4,"jsonrpc":"2.0"}
+2026-02-27 18:09:04.038 | {"result":{"content":[{"type":"text","text":"{\u0022totalItems\u0022:50,\u0022totalPrice\u0022:799.5,\u0022currency\u0022:\u0022USD\u0022}"}]},"id":5,"jsonrpc":"2.0"}
+2026-02-27 18:09:51.041 | *****
+2026-02-27 18:09:51.043 | Added -20 pairs to your cart. Total: 30 pairs.
+2026-02-27 18:09:51.043 | *****
+2026-02-27 18:09:51.043 | {"result":{"content":[]},"id":6,"jsonrpc":"2.0"}
+2026-02-27 18:10:15.411 | *****
+2026-02-27 18:10:15.412 | Added -30 pairs to your cart. Total: 0 pairs.
+2026-02-27 18:10:15.412 | *****
+2026-02-27 18:10:15.412 | {"result":{"content":[]},"id":7,"jsonrpc":"2.0"}
 ```
 
 **Benefits of external MCP servers:**
