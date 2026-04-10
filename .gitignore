@@ -19,3 +19,4 @@ exercises/**/.NCrunch_CorrectiveRetrievalAugmentedGeneration/
 
 exercises/CorrectiveRetrievalAugmentedGeneration/qdrant_storage/
 
+exercises/**/ollama/*
