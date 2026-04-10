@@ -27,6 +27,8 @@ var innerChatClient = new AzureOpenAIClient(
 // var innerChatClient = new OllamaChatClient(new Uri("http://localhost:11434"), "llama3.1");
 
 hostBuilder.Services.AddChatClient(innerChatClient)
+    .UseLanguage("Icelandic")
+    .UseRateLimit(TimeSpan.FromSeconds(5))
     .UseFunctionInvocation();
 
 // Run the app
@@ -43,7 +45,7 @@ IMcpClient mcpClient = await McpClientFactory.CreateAsync(
     new StdioClientTransport(new()
     {
         Command = "docker",
-        Arguments = ["exec", "-i", "--rm", "mcpserver"],
+        Arguments = ["run", "-i", "--rm", "mcpserver"],
         Name = "E-commerce MCP Server"
     }));
 
