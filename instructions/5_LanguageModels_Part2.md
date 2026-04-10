@@ -822,6 +822,8 @@ We'll create some simple middleware that causes the LLM's response to come back 
 Start by defining a class like this:
 
 ```cs
+namespace Microsoft.Extensions.AI;
+
 public static class UseLanguageStep
 {
     // This is an extension method that lets you add UseLanguageChatClient into a pipeline
